@@ -3,6 +3,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
 import secrets
 
@@ -11,6 +12,13 @@ from db.redis_client import add_key_value_redis, delete_key_redis, get_value_red
 from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("HubSpotIntegration")
 
 load_dotenv()
 
@@ -22,6 +30,7 @@ authorization_url = f"https://app.hubspot.com/oauth/authorize?"
 
 
 async def authorize_hubspot(user_id, org_id):
+    logger.info("Starting authorization process for user_id=%s, org_id=%s", user_id, org_id)
     state_data = {
         "state": secrets.token_urlsafe(32),
         "user_id": user_id,
@@ -34,7 +43,6 @@ async def authorize_hubspot(user_id, org_id):
     m.update(code_verifier.encode("utf-8"))
     code_challenge = base64.urlsafe_b64encode(m.digest()).decode("utf-8").replace("=", "")
 
-    # Updated with all required HubSpot scopes
     auth_url = (
         f"{authorization_url}"
         f"client_id={CLIENT_ID}&"
@@ -53,17 +61,17 @@ async def authorize_hubspot(user_id, org_id):
         ),
         add_key_value_redis(f"hubspot_verifier:{org_id}:{user_id}", code_verifier, expire=600),
     )
-    print(f"Stored state and verifier for org_id: {org_id}, user_id: {user_id}")
-
+    logger.info("Stored state and verifier for org_id=%s, user_id=%s", org_id, user_id)
     return auth_url
 
 
 async def oauth2callback_hubspot(request: Request):
+    logger.info("Processing OAuth2 callback.")
+
     if request.query_params.get("error"):
-        raise HTTPException(
-            status_code=400,
-            detail=request.query_params.get("error_description"),
-        )
+        error_description = request.query_params.get("error_description")
+        logger.error("OAuth2 error: %s", error_description)
+        raise HTTPException(status_code=400, detail=error_description)
 
     code = request.query_params.get("code")
     encoded_state = request.query_params.get("state")
@@ -79,55 +87,57 @@ async def oauth2callback_hubspot(request: Request):
     )
 
     if not saved_state or original_state != json.loads(saved_state).get("state"):
+        logger.error("State mismatch for org_id=%s, user_id=%s", org_id, user_id)
         raise HTTPException(status_code=400, detail="State does not match.")
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://api.hubapi.com/oauth/v1/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": REDIRECT_URI,
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-                "code_verifier": code_verifier,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
+        try:
+            response = await client.post(
+                "https://api.hubapi.com/oauth/v1/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": REDIRECT_URI,
+                    "client_id": CLIENT_ID,
+                    "client_secret": CLIENT_SECRET,
+                    "code_verifier": code_verifier,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            logger.error("Failed to exchange code for token: %s", e)
+            raise HTTPException(status_code=500, detail="Token exchange failed.")
 
-    # Get both access and refresh tokens
     response_json = response.json()
-    # access_token = response_json.get("access_token")
-    # refresh_token = response_json.get("refresh_token")
+    logger.info("Received tokens for user_id=%s, org_id=%s", user_id, org_id)
 
-    # Store the credentials (including refresh token)
     await add_key_value_redis(
         f"hubspot_credentials:{org_id}:{user_id}",
         json.dumps(response_json),
         expire=600,
     )
 
-    # Clear saved state and verifier
     await asyncio.gather(
         delete_key_redis(f"hubspot_state:{org_id}:{user_id}"),
         delete_key_redis(f"hubspot_verifier:{org_id}:{user_id}"),
     )
+    logger.info("Cleared temporary state and verifier for org_id=%s, user_id=%s", org_id, user_id)
 
     return HTMLResponse(content="<html><script>window.close();</script></html>")
 
 
 async def get_hubspot_credentials(user_id, org_id):
-    print(org_id, user_id, "================cred==============")
+    logger.info("Fetching credentials for user_id=%s, org_id=%s", user_id, org_id)
     credentials = await get_value_redis(f"hubspot_credentials:{org_id}:{user_id}")
-    print(credentials, "================cred get==============")
     if not credentials:
+        logger.warning("No credentials found for user_id=%s, org_id=%s", user_id, org_id)
         raise HTTPException(status_code=400, detail="No credentials found.")
-    credentials = json.loads(credentials)
-    # await delete_key_redis(f"hubspot_credentials:{org_id}:{user_id}")
-    return credentials
+    return json.loads(credentials)
 
 
 async def create_integration_item_metadata_object(response_json):
+    logger.debug(f"Creating metadata object for response: {response_json}")
     return {
         "id": response_json.get("id"),
         "name": response_json.get("name"),
@@ -137,11 +147,13 @@ async def create_integration_item_metadata_object(response_json):
 
 
 async def get_items_hubspot(credentials):
+    logger.info("Starting to fetch items from HubSpot.")
     if isinstance(credentials, str):
         credentials = json.loads(credentials)
 
     access_token = credentials.get("access_token")
     if not access_token:
+        logger.error("No access token found in credentials.")
         raise ValueError("No access token found in credentials")
 
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -152,87 +164,95 @@ async def get_items_hubspot(credentials):
     while url:
         async with httpx.AsyncClient() as client:
             try:
+                logger.info(f"Making GET request to {url}")
                 response = await client.get(url, headers=headers)
-                response.raise_for_status()  # Raises HTTPError for bad responses (4xx, 5xx)
+                response.raise_for_status()
             except httpx.HTTPStatusError as e:
-                # Check if token has expired (HTTP 401 Unauthorized)
+                logger.error(f"HTTP status error: {e}")
                 if e.response.status_code == 401:
-                    print("Access token expired, refreshing token.")
-                    # Attempt to refresh the access token
+                    logger.info("Access token expired, attempting to refresh.")
                     access_token = await refresh_access_token_hubspot(credentials["user_id"], credentials["org_id"])
                     headers = {"Authorization": f"Bearer {access_token}"}
-                    # Retry the request with the new access token
                     response = await client.get(url, headers=headers)
                     response.raise_for_status()
                 else:
-                    # Handle other status codes
-                    print(f"HTTP error occurred: {e}")
+                    logger.error(f"Unhandled HTTP error: {e}")
                     break
             except httpx.RequestError as e:
-                print(f"Request error occurred: {e}")
+                logger.error(f"Request error occurred: {e}")
                 break
             except Exception as e:
-                print(f"An error occurred: {e}")
+                logger.error(f"Unexpected error occurred: {e}")
                 break
 
             try:
                 data = response.json()
+                logger.debug(f"Received data: {data}")
             except ValueError as e:
-                print(f"Error parsing JSON: {e}")
+                logger.error(f"Error parsing JSON: {e}")
                 break
 
             for item in data.get("results", []):
-                list_of_items.append(await create_integration_item_metadata_object(item))
+                metadata_object = await create_integration_item_metadata_object(item)
+                logger.debug(f"Appending item: {metadata_object}")
+                list_of_items.append(metadata_object)
 
-            # Pagination logic
             url = data.get("paging", {}).get("next", {}).get("link", None)
+            if url:
+                logger.info(f"Next page URL: {url}")
 
+    logger.info("Completed fetching items from HubSpot.")
     return list_of_items
 
 
 async def refresh_access_token_hubspot(user_id, org_id):
-    print(user_id, org_id, "=====refreshytoken====")
-    print(await get_value_redis(f"hubspot_credentials:{org_id}:{user_id}"))
-
+    logger.info(f"Refreshing access token for user_id={user_id}, org_id={org_id}")
     credentials = await get_value_redis(f"hubspot_credentials:{org_id}:{user_id}")
-    print(credentials, "================cred==============")
-    if credentials is None:
-        print("Credentials not found in Redis")
-    else:
-        print(f"Credentials: {json.loads(credentials)}")
-    if not credentials:
-        raise HTTPException(status_code=400, detail="No credentials found.")
-    credentials = json.loads(credentials)
+    logger.debug(f"Credentials from Redis: {credentials}")
 
+    if not credentials:
+        logger.error("Credentials not found in Redis.")
+        raise HTTPException(status_code=400, detail="No credentials found.")
+
+    credentials = json.loads(credentials)
     refresh_token = credentials.get("refresh_token")
     if not refresh_token:
+        logger.error("No refresh token found in credentials.")
         raise HTTPException(status_code=400, detail="No refresh token found.")
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://api.hubapi.com/oauth/v1/token",
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
+        try:
+            logger.info("Sending refresh token request to HubSpot.")
+            response = await client.post(
+                "https://api.hubapi.com/oauth/v1/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": CLIENT_ID,
+                    "client_secret": CLIENT_SECRET,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response.raise_for_status()
+            response_json = response.json()
+            logger.debug(f"Refresh token response: {response_json}")
+        except httpx.RequestError as e:
+            logger.error(f"Request error during token refresh: {e}")
+            raise HTTPException(status_code=500, detail="Failed to refresh access token.")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP status error during token refresh: {e}")
+            raise HTTPException(status_code=400, detail="Failed to refresh access token.")
 
-    # Get the new access token
-    response_json = response.json()
     new_access_token = response_json.get("access_token")
-    # new_refresh_token = response_json.get("refresh_token")
-
     if not new_access_token:
+        logger.error("No new access token returned in response.")
         raise HTTPException(status_code=400, detail="Failed to refresh access token.")
 
-    # Store the new tokens
+    logger.info("Storing new access token in Redis.")
     await add_key_value_redis(
         f"hubspot_credentials:{org_id}:{user_id}",
         json.dumps(response_json),
         expire=600,
     )
 
-    return response_json
+    return new_access_token
