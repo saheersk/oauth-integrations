@@ -1,19 +1,19 @@
 # airtable.py
+
 import os
-import datetime
 import json
 import secrets
-
-from fastapi import Request, HTTPException
-from fastapi.responses import HTMLResponse
-import httpx
-import asyncio
 import base64
 import hashlib
-from dotenv import load_dotenv
-import requests
-from integrations.integration_item import IntegrationItem
+import asyncio
 
+import httpx
+import requests
+from fastapi import Request, HTTPException
+from fastapi.responses import HTMLResponse
+from dotenv import load_dotenv
+
+from integrations.integration_item import IntegrationItem
 from db.redis_client import add_key_value_redis, get_value_redis, delete_key_redis
 
 load_dotenv()
@@ -26,6 +26,7 @@ authorization_url = f'https://airtable.com/oauth2/v1/authorize?client_id={CLIENT
 
 encoded_client_id_secret = base64.b64encode(f'{CLIENT_ID}:{CLIENT_SECRET}'.encode()).decode()
 scope = 'data.records:read data.records:write data.recordComments:read data.recordComments:write schema.bases:read schema.bases:write'
+
 
 async def authorize_airtable(user_id, org_id):
     state_data = {
