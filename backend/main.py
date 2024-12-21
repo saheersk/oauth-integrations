@@ -1,8 +1,6 @@
+from api.v1 import airtable_routes, hubspot_routes, notion_routes
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from api.v1 import airtable_routes, notion_routes, hubspot_routes
-
 
 app = FastAPI()
 
@@ -18,10 +16,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Root endpoint
-@app.get('/')
+@app.get("/")
 def read_root():
-    return {'Ping': 'Pong'}
+    return {"Ping": "Pong"}
 
 
 # Include the integration routers

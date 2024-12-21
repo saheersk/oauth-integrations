@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Form, Request
-
-from integrations.hubspot import authorize_hubspot, oauth2callback_hubspot, get_hubspot_credentials, get_items_hubspot
-
+from integrations.hubspot import (
+    authorize_hubspot,
+    get_hubspot_credentials,
+    get_items_hubspot,
+    oauth2callback_hubspot,
+)
 
 router = APIRouter()
 

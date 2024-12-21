@@ -3,7 +3,7 @@ import os
 import redis.asyncio as redis
 from kombu.utils.url import safequote
 
-redis_host = safequote(os.environ.get('REDIS_HOST', 'localhost'))
+redis_host = safequote(os.environ.get("REDIS_HOST", "localhost"))
 redis_client = redis.Redis(host=redis_host, port=6379, db=0)
 
 
