@@ -1,0 +1,43 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+
+# Virtual Environment
+venv/
+env/
+*.env
+
+# Egg files
+*.egg
+*.egg-info
+dist/
+build/
+
+# pyinstaller
+*.manifest
+*.spec
+
+# mypy
+.mypy_cache/
+
+# pytest
+.cache/
+
+# fastapi & Uvicorn
+*.db-journal
+
+# VS Code settings
+.vscode/
+
+# Local configuration files (not for production)
+*.local
+
+
+# Mac OS
+.DS_Store
