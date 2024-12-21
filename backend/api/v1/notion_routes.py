@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Form, Request
 
-from app.integrations.notions import authorize_notion, oauth2callback_notion, get_notion_credentials, get_items_notion
+from integrations.notion import authorize_notion, oauth2callback_notion, get_notion_credentials, get_items_notion
 
 
 router = APIRouter()

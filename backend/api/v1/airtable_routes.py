@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Form, Request
 
-from app.integrations.airtable import authorize_airtable, oauth2callback_airtable, get_airtable_credentials, get_items_airtable
+from integrations.airtable import authorize_airtable, oauth2callback_airtable, get_airtable_credentials, get_items_airtable
 
 
 router = APIRouter()

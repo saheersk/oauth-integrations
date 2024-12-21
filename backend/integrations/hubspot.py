@@ -9,7 +9,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import HTMLResponse
 import httpx
 from dotenv import load_dotenv
-from redis_client import add_key_value_redis, get_value_redis, delete_key_redis
+from db.redis_client import add_key_value_redis, get_value_redis, delete_key_redis
 
 load_dotenv()
 
