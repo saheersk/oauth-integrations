@@ -1,8 +1,8 @@
 // hubspot.js
 
-import { useState, useEffect } from "react";
-import { Box, Button, CircularProgress } from "@mui/material";
-import axios from "axios";
+import { useState, useEffect } from 'react';
+import { Box, Button, CircularProgress } from '@mui/material';
+import axios from 'axios';
 
 export const HubSpotIntegration = ({
   user,
@@ -18,8 +18,8 @@ export const HubSpotIntegration = ({
     try {
       setIsConnecting(true);
       const formData = new FormData();
-      formData.append("user_id", user);
-      formData.append("org_id", org);
+      formData.append('user_id', user);
+      formData.append('org_id', org);
       const response = await axios.post(
         `http://localhost:8000/integrations/hubspot/authorize`,
         formData
@@ -28,8 +28,8 @@ export const HubSpotIntegration = ({
 
       const newWindow = window.open(
         authURL,
-        "HubSpot Authorization",
-        "width=600, height=600"
+        'HubSpot Authorization',
+        'width=600, height=600'
       );
 
       // Polling for the window to close
@@ -42,7 +42,7 @@ export const HubSpotIntegration = ({
     } catch (e) {
       setIsConnecting(false);
       alert(
-        e?.response?.data?.detail || "Failed to start HubSpot authorization."
+        e?.response?.data?.detail || 'Failed to start HubSpot authorization.'
       );
     }
   };
@@ -51,8 +51,8 @@ export const HubSpotIntegration = ({
     try {
       setIsConnecting(true); // Indicate that the request is being processed
       const formData = new FormData();
-      formData.append("user_id", user);
-      formData.append("org_id", org);
+      formData.append('user_id', user);
+      formData.append('org_id', org);
 
       const response = await axios.post(
         `http://localhost:8000/integrations/hubspot/refresh_token`,
@@ -60,11 +60,11 @@ export const HubSpotIntegration = ({
       );
       const newAccessToken = response?.data?.access_token;
 
-      console.log(integrationParams, "before=================")
+      console.log(integrationParams, 'before=================');
 
       if (newAccessToken) {
         // Handle the successful response here
-        alert("Access token refreshed successfully!");
+        alert('Access token refreshed successfully!');
         // Update the credentials or perform any action necessary with the new token
         setIntegrationParams((prev) => ({
           ...prev,
@@ -73,13 +73,13 @@ export const HubSpotIntegration = ({
             access_token: newAccessToken,
           },
         }));
-        console.log(integrationParams, "after=================")
+        console.log(integrationParams, 'after=================');
       }
       setIsConnecting(false);
     } catch (e) {
       setIsConnecting(false); // Reset the loading state
       alert(
-        e?.response?.data?.detail || "Failed to refresh HubSpot access token."
+        e?.response?.data?.detail || 'Failed to refresh HubSpot access token.'
       );
     }
   };
@@ -88,8 +88,8 @@ export const HubSpotIntegration = ({
   const handleWindowClosed = async () => {
     try {
       const formData = new FormData();
-      formData.append("user_id", user);
-      formData.append("org_id", org);
+      formData.append('user_id', user);
+      formData.append('org_id', org);
       const response = await axios.post(
         `http://localhost:8000/integrations/hubspot/credentials`,
         formData
@@ -101,13 +101,13 @@ export const HubSpotIntegration = ({
         setIntegrationParams((prev) => ({
           ...prev,
           credentials: credentials,
-          type: "HubSpot",
+          type: 'HubSpot',
         }));
       }
     } catch (e) {
       setIsConnecting(false);
       alert(
-        e?.response?.data?.detail || "Failed to retrieve HubSpot credentials."
+        e?.response?.data?.detail || 'Failed to retrieve HubSpot credentials.'
       );
     }
   };
@@ -129,42 +129,42 @@ export const HubSpotIntegration = ({
           <Button
             variant="contained"
             onClick={isConnected ? () => {} : handleConnectClick}
-            color={isConnected ? "success" : "primary"}
+            color={isConnected ? 'success' : 'primary'}
             disabled={isConnecting}
             style={{
-              pointerEvents: isConnected ? "none" : "auto",
-              cursor: isConnected ? "default" : "pointer",
+              pointerEvents: isConnected ? 'none' : 'auto',
+              cursor: isConnected ? 'default' : 'pointer',
               opacity: isConnected ? 1 : undefined,
             }}
           >
             {isConnected ? (
-              "HubSpot Connected"
+              'HubSpot Connected'
             ) : isConnecting ? (
               <CircularProgress size={20} />
             ) : (
-              "Connect to HubSpot"
+              'Connect to HubSpot'
             )}
           </Button>
         </Box>
-          <Box
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            sx={{ mt: 2 }}
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          sx={{ mt: 2 }}
+        >
+          <Button
+            variant="contained"
+            onClick={handleRefreshTokenClick}
+            color="secondary"
+            disabled={isConnecting || !isConnected}
           >
-            <Button
-              variant="contained"
-              onClick={handleRefreshTokenClick}
-              color="secondary"
-              disabled={isConnecting || !isConnected}
-            >
-              {isConnecting ? (
-                <CircularProgress size={20} />
-              ) : (
-                "Refresh HubSpot Token"
-              )}
-            </Button>
-          </Box>
+            {isConnecting ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Refresh HubSpot Token'
+            )}
+          </Button>
+        </Box>
       </Box>
     </>
   );
