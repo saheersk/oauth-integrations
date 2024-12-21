@@ -34,7 +34,8 @@ export const DataForm = ({ integrationType, credentials }) => {
             alert(e?.response?.data?.detail || 'Error loading data');
         }
     };
-
+    
+    
     return (
         <Box display='flex' justifyContent='center' alignItems='center' flexDirection='column' width='100%'>
             <Box display='flex' flexDirection='column' width='100%'>

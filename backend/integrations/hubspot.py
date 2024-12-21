@@ -82,27 +82,35 @@ async def oauth2callback_hubspot(request: Request):
         raise HTTPException(status_code=400, detail="State does not match.")
 
     async with httpx.AsyncClient() as client:
-        response, _, _ = await asyncio.gather(
-            client.post(
-                "https://api.hubapi.com/oauth/v1/token",
-                data={
-                    "grant_type": "authorization_code",
-                    "code": code,
-                    "redirect_uri": REDIRECT_URI,
-                    "client_id": CLIENT_ID,
-                    "client_secret": CLIENT_SECRET,
-                    "code_verifier": code_verifier,
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            ),
-            delete_key_redis(f"hubspot_state:{org_id}:{user_id}"),
-            delete_key_redis(f"hubspot_verifier:{org_id}:{user_id}"),
+        response = await client.post(
+            "https://api.hubapi.com/oauth/v1/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": REDIRECT_URI,
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+                "code_verifier": code_verifier,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
+    # Get both access and refresh tokens
+    response_json = response.json()
+    # access_token = response_json.get("access_token")
+    # refresh_token = response_json.get("refresh_token")
+
+    # Store the credentials (including refresh token)
     await add_key_value_redis(
         f"hubspot_credentials:{org_id}:{user_id}",
-        json.dumps(response.json()),
+        json.dumps(response_json),
         expire=600,
+    )
+
+    # Clear saved state and verifier
+    await asyncio.gather(
+        delete_key_redis(f"hubspot_state:{org_id}:{user_id}"),
+        delete_key_redis(f"hubspot_verifier:{org_id}:{user_id}"),
     )
 
     return HTMLResponse(content="<html><script>window.close();</script></html>")
@@ -111,10 +119,11 @@ async def oauth2callback_hubspot(request: Request):
 async def get_hubspot_credentials(user_id, org_id):
     print(org_id, user_id, "================cred==============")
     credentials = await get_value_redis(f"hubspot_credentials:{org_id}:{user_id}")
+    print(credentials, "================cred get==============")
     if not credentials:
         raise HTTPException(status_code=400, detail="No credentials found.")
     credentials = json.loads(credentials)
-    await delete_key_redis(f"hubspot_credentials:{org_id}:{user_id}")
+    # await delete_key_redis(f"hubspot_credentials:{org_id}:{user_id}")
     return credentials
 
 
@@ -146,30 +155,84 @@ async def get_items_hubspot(credentials):
                 response = await client.get(url, headers=headers)
                 response.raise_for_status()  # Raises HTTPError for bad responses (4xx, 5xx)
             except httpx.HTTPStatusError as e:
-                # Handle different status codes
-                print(f"HTTP error occurred: {e}")
-                break
+                # Check if token has expired (HTTP 401 Unauthorized)
+                if e.response.status_code == 401:
+                    print("Access token expired, refreshing token.")
+                    # Attempt to refresh the access token
+                    access_token = await refresh_access_token_hubspot(credentials["user_id"], credentials["org_id"])
+                    headers = {"Authorization": f"Bearer {access_token}"}
+                    # Retry the request with the new access token
+                    response = await client.get(url, headers=headers)
+                    response.raise_for_status()
+                else:
+                    # Handle other status codes
+                    print(f"HTTP error occurred: {e}")
+                    break
             except httpx.RequestError as e:
-                # Handle request-level errors (e.g., network issues)
                 print(f"Request error occurred: {e}")
                 break
             except Exception as e:
-                # Handle any other exceptions
                 print(f"An error occurred: {e}")
                 break
 
-            # Parse the JSON response
             try:
                 data = response.json()
             except ValueError as e:
                 print(f"Error parsing JSON: {e}")
                 break
 
-            # Process the results
             for item in data.get("results", []):
                 list_of_items.append(await create_integration_item_metadata_object(item))
 
-            # Check for pagination and continue if more pages are available
+            # Pagination logic
             url = data.get("paging", {}).get("next", {}).get("link", None)
 
     return list_of_items
+
+
+async def refresh_access_token_hubspot(user_id, org_id):
+    print(user_id, org_id, "=====refreshytoken====")
+    print(await get_value_redis(f"hubspot_credentials:{org_id}:{user_id}"))
+
+    credentials = await get_value_redis(f"hubspot_credentials:{org_id}:{user_id}")
+    print(credentials, "================cred==============")
+    if credentials is None:
+        print("Credentials not found in Redis")
+    else:
+        print(f"Credentials: {json.loads(credentials)}")
+    if not credentials:
+        raise HTTPException(status_code=400, detail="No credentials found.")
+    credentials = json.loads(credentials)
+
+    refresh_token = credentials.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="No refresh token found.")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.hubapi.com/oauth/v1/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+
+    # Get the new access token
+    response_json = response.json()
+    new_access_token = response_json.get("access_token")
+    # new_refresh_token = response_json.get("refresh_token")
+
+    if not new_access_token:
+        raise HTTPException(status_code=400, detail="Failed to refresh access token.")
+
+    # Store the new tokens
+    await add_key_value_redis(
+        f"hubspot_credentials:{org_id}:{user_id}",
+        json.dumps(response_json),
+        expire=600,
+    )
+
+    return response_json
