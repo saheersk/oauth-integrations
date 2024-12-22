@@ -6,12 +6,14 @@ import json
 import logging
 import os
 import secrets
+from typing import List, Union
 
 import httpx
 from db.redis_client import add_key_value_redis, delete_key_redis, get_value_redis
 from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
+from integrations.integration_item import IntegrationItem
 
 # Configure logging
 logging.basicConfig(
@@ -146,7 +148,7 @@ async def create_integration_item_metadata_object(response_json):
     }
 
 
-async def get_items_hubspot(credentials):
+async def get_items_hubspot(credentials: Union[str, dict]) -> List[IntegrationItem]:
     logger.info("Starting to fetch items from HubSpot.")
     if isinstance(credentials, str):
         credentials = json.loads(credentials)
@@ -162,7 +164,7 @@ async def get_items_hubspot(credentials):
     list_of_items = []
 
     while url:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10) as client:
             try:
                 logger.info(f"Making GET request to {url}")
                 response = await client.get(url, headers=headers)
@@ -170,11 +172,15 @@ async def get_items_hubspot(credentials):
             except httpx.HTTPStatusError as e:
                 logger.error(f"HTTP status error: {e}")
                 if e.response.status_code == 401:
-                    logger.info("Access token expired, attempting to refresh.")
-                    access_token = await refresh_access_token_hubspot(credentials["user_id"], credentials["org_id"])
-                    headers = {"Authorization": f"Bearer {access_token}"}
-                    response = await client.get(url, headers=headers)
-                    response.raise_for_status()
+                    try:
+                        logger.info("Access token expired, attempting to refresh.")
+                        access_token = await refresh_access_token_hubspot(credentials["user_id"], credentials["org_id"])
+                        headers = {"Authorization": f"Bearer {access_token}"}
+                        response = await client.get(url, headers=headers)
+                        response.raise_for_status()
+                    except Exception as token_refresh_error:
+                        logger.error(f"Token refresh failed: {token_refresh_error}")
+                        break
                 else:
                     logger.error(f"Unhandled HTTP error: {e}")
                     break
@@ -193,9 +199,12 @@ async def get_items_hubspot(credentials):
                 break
 
             for item in data.get("results", []):
-                metadata_object = await create_integration_item_metadata_object(item)
-                logger.debug(f"Appending item: {metadata_object}")
-                list_of_items.append(metadata_object)
+                try:
+                    metadata_object = await create_integration_item_metadata_object(item)
+                    logger.debug(f"Appending item: {metadata_object}")
+                    list_of_items.append(metadata_object)
+                except Exception as e:
+                    logger.error(f"Failed to process item {item}: {e}")
 
             url = data.get("paging", {}).get("next", {}).get("link", None)
             if url:

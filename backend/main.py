@@ -1,8 +1,20 @@
 from api.v1 import airtable_routes, hubspot_routes, notion_routes
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
-app = FastAPI()
+app = FastAPI(
+    title="Integration API",
+    description="API to integrate with Airtable, Notion, and HubSpot.",
+    version="1.0.0",
+    contact={
+        "name": "Your Name",
+        "email": "your.email@example.com",
+    },
+    license_info={
+        "name": "MIT License",
+    },
+)
 
 origins = [
     "http://localhost:3000",  # React app address
@@ -27,3 +39,19 @@ def read_root():
 app.include_router(airtable_routes.router, prefix="/integrations/airtable", tags=["Airtable"])
 app.include_router(notion_routes.router, prefix="/integrations/notion", tags=["Notion"])
 app.include_router(hubspot_routes.router, prefix="/integrations/hubspot", tags=["HubSpot"])
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="Integration API",
+        version="1.0.0",
+        description="This is the API for integrating Airtable, Notion, and HubSpot.",
+        routes=app.routes,
+    )
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
