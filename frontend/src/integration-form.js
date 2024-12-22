@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Box, Autocomplete, TextField, Typography, Paper } from "@mui/material";
+import { Box, Autocomplete, TextField, Typography, Paper, Button } from "@mui/material";
 import { AirtableIntegration } from "./integrations/airtable";
 import { NotionIntegration } from "./integrations/notion";
 import { HubSpotIntegration } from "./integrations/hubspot"; 
@@ -17,6 +17,11 @@ export const IntegrationForm = () => {
   const [org, setOrg] = useState("TestOrg");
   const [currType, setCurrType] = useState(null);
   const CurrIntegration = integrationMapping[currType];
+
+  const handleRemoveToken = () => {
+    setIntegrationParams({});
+    setCurrType(null); 
+  };
 
   return (
     <Box
@@ -86,6 +91,18 @@ export const IntegrationForm = () => {
               setIntegrationParams={setIntegrationParams}
             />
           </Box>
+        )}
+        {integrationParams?.credentials && (
+          <Box sx={{ mt: 2, display: "flex", justifyContent: "center" }}>
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={handleRemoveToken}
+            sx={{ width: "50%" }}
+          >
+            Logout
+          </Button>
+        </Box>
         )}
         {integrationParams?.credentials && (
           <Box sx={{ mt: 4 }}>
