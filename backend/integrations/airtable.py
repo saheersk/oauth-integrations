@@ -182,3 +182,60 @@ async def get_items_airtable(credentials) -> list[IntegrationItem]:
 
     print(f"list_of_integration_item_metadata: {list_of_integration_item_metadata}")
     return list_of_integration_item_metadata
+
+
+# async def get_items_airtable(credentials) -> list:
+#     credentials = json.loads(credentials)
+#     url = "https://api.airtable.com/v0/meta/bases"
+#     list_of_integration_item_metadata = []
+#     list_of_responses = []
+
+#     # Fetch bases from Airtable API
+#     fetch_items(credentials.get("access_token"), url, list_of_responses)
+
+#     for response in list_of_responses:
+#         # Add metadata for base
+#         list_of_integration_item_metadata.append(create_integration_item_metadata_object(response, "Base"))
+
+#         # Fetch tables for the base
+#         tables_response = requests.get(
+#             f'https://api.airtable.com/v0/meta/bases/{response.get("id")}/tables',
+#             headers={"Authorization": f'Bearer {credentials.get("access_token")}'},
+#         )
+
+#         if tables_response.status_code == 200:
+#             tables_response = tables_response.json()
+#             for table in tables_response["tables"]:
+#                 list_of_integration_item_metadata.append(
+#                     create_integration_item_metadata_object(
+#                         table,
+#                         "Table",
+#                         response.get("id", None),
+#                         response.get("name", None),
+#                     )
+#                 )
+
+#                 # Optionally, fetch records from each table
+#                 records_response = requests.get(
+#                     f'https://api.airtable.com/v0/{response.get("id")}/{table.get("id")}',
+#                     headers={"Authorization": f'Bearer {credentials.get("access_token")}'},
+#                 )
+#                 if records_response.status_code == 200:
+#                     records = records_response.json().get("records", [])
+#                     # Process each record for more detailed project data (e.g., fields, values)
+#                     for record in records:
+#                         list_of_integration_item_metadata.append({
+#                             "type": "Record",
+#                             "id": record.get("id"),
+#                             "fields": record.get("fields"),
+#                             "table": table.get("name"),
+#                             "base": response.get("name"),
+#                         })
+#                 else:
+#                     print(f"Error fetching records for table {table.get('name')}: {records_response.status_code}")
+
+#         else:
+#             print(f"Error fetching tables for base {response.get('name')}: {tables_response.status_code}")
+
+#     print(f"list_of_integration_item_metadata: {list_of_integration_item_metadata}")
+#     return list_of_integration_item_metadata

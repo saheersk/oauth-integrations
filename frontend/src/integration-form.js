@@ -30,7 +30,7 @@ export const IntegrationForm = () => {
       alignItems="center"
       flexDirection="column"
       sx={{
-        width: "100%",
+        width: "100wh",
         minHeight: "100vh", 
         backgroundColor: "#f5f5f5", 
         padding: 2, 
@@ -40,7 +40,7 @@ export const IntegrationForm = () => {
         sx={{
           padding: 4,
           width: "100%",
-          maxWidth: 500, 
+          maxWidth: 800, 
           borderRadius: 2,
           boxShadow: 3, 
           backgroundColor: "#fff", 
