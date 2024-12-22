@@ -49,12 +49,12 @@ export const DataForm = ({ integrationType, credentials, userId }) => {
         alert("Rate limit exceeded. Please try again later.");
         return;
       }
-      
+
       setLoadedData(response.data);
     } catch (e) {
       alert(e?.response?.data?.detail || "Error loading data");
     } finally {
-      setLoading(false); // End loading
+      setLoading(false);
     }
   };
 
