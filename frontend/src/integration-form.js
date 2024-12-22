@@ -92,6 +92,7 @@ export const IntegrationForm = () => {
             <DataForm
               integrationType={integrationParams?.type}
               credentials={integrationParams?.credentials}
+              userId={user}
             />
           </Box>
         )}

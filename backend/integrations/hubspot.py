@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
 from integrations.integration_item import IntegrationItem
+from services.rate_limit import is_rate_limited
 
 # Configure logging
 logging.basicConfig(
@@ -150,8 +151,17 @@ async def create_integration_item_metadata_object(response_json):
 
 async def get_items_hubspot(credentials: Union[str, dict]) -> List[IntegrationItem]:
     logger.info("Starting to fetch items from HubSpot.")
+
     if isinstance(credentials, str):
         credentials = json.loads(credentials)
+
+    user_id = credentials.get("user_id")
+    if not user_id:
+        logger.error("No user_id found in credentials.")
+        raise ValueError("No user_id found in credentials")
+
+    if await is_rate_limited(user_id):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
 
     access_token = credentials.get("access_token")
     if not access_token:

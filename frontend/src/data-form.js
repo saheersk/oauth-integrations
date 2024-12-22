@@ -12,7 +12,7 @@ const endpointMapping = {
     'HubSpot': 'hubspot', 
 };
 
-export const DataForm = ({ integrationType, credentials }) => {
+export const DataForm = ({ integrationType, credentials, userId }) => {
     const [loadedData, setLoadedData] = useState(null);
     const endpoint = endpointMapping[integrationType];
 
@@ -24,10 +24,19 @@ export const DataForm = ({ integrationType, credentials }) => {
 
         try {
             const formData = new FormData();
-            formData.append('credentials', JSON.stringify(credentials));
+
+            const credentialsWithUser = { ...credentials, user_id: userId };
+            formData.append('credentials', JSON.stringify(credentialsWithUser));
+
 
             // Make API request to the corresponding endpoint
             const response = await axios.post(`http://localhost:8000/integrations/${endpoint}/load`, formData);
+            
+            if (response.status === 429) {
+                alert('Rate limit exceeded. Please try again later.');
+                return;
+            }
+
             const data = JSON.stringify(response.data);
             setLoadedData(data);
         } catch (e) {
