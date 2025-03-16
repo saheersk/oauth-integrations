@@ -9,12 +9,14 @@ import secrets
 from typing import List, Union
 
 import httpx
-from backend.db.redis_client import add_key_value_redis, delete_key_redis, get_value_redis
 from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
+
 from integrations.integration_item import IntegrationItem
-# from services.rate_limit import is_rate_limited
+from services.rate_limit import is_rate_limited
+from db.redis_client import add_key_value_redis, delete_key_redis, \
+    get_value_redis
 
 # Configure logging
 logging.basicConfig(
@@ -33,18 +35,21 @@ authorization_url = "https://app.hubspot.com/oauth/authorize?"
 
 
 async def authorize_hubspot(user_id, org_id):
-    logger.info("Starting authorization process for user_id=%s, org_id=%s", user_id, org_id)
+    logger.info("Starting authorization process for user_id=%s, org_id=%s",
+                user_id, org_id)
     state_data = {
         "state": secrets.token_urlsafe(32),
         "user_id": user_id,
         "org_id": org_id,
     }
-    encoded_state = base64.urlsafe_b64encode(json.dumps(state_data).encode("utf-8")).decode("utf-8")
+    encoded_state = base64.urlsafe_b64encode(
+        json.dumps(state_data).encode("utf-8")).decode("utf-8")
 
     code_verifier = secrets.token_urlsafe(32)
     m = hashlib.sha256()
     m.update(code_verifier.encode("utf-8"))
-    code_challenge = base64.urlsafe_b64encode(m.digest()).decode("utf-8").replace("=", "")
+    code_challenge = base64.urlsafe_b64encode(
+        m.digest()).decode("utf-8").replace("=", "")
 
     auth_url = (
         f"{authorization_url}"
@@ -149,13 +154,12 @@ async def create_integration_item_metadata_object(response_json):
     }
 
 
-async def get_items_hubspot(credentials: Union[str, dict]) -> List[IntegrationItem]:
+async def get_items_hubspot(
+        credentials: Union[str, dict]) -> List[IntegrationItem]:
     logger.info("Fetching items from HubSpot.")
 
     if isinstance(credentials, str):
         credentials = json.loads(credentials)
-    
-    print(credentials, "====credentials====")
 
     user_id = credentials.get("user_id")
     org_id = credentials.get("org_id")
@@ -164,8 +168,8 @@ async def get_items_hubspot(credentials: Union[str, dict]) -> List[IntegrationIt
         logger.error("Missing user_id or org_id in credentials.")
         raise ValueError("Missing user_id or org_id in credentials")
 
-    # if await is_rate_limited(user_id):
-    #     raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
+    if await is_rate_limited(user_id):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
 
     access_token = credentials.get("access_token")
     if not access_token:
@@ -197,8 +201,6 @@ async def get_items_hubspot(credentials: Union[str, dict]) -> List[IntegrationIt
 
             data = response.json()
             items = data.get("results", [])
-
-            print(items, "==items====")
 
             for item in items:
                 integration_item = IntegrationItem(
@@ -248,15 +250,18 @@ async def refresh_access_token_hubspot(user_id, org_id):
             logger.debug(f"Refresh token response: {response_json}")
         except httpx.RequestError as e:
             logger.error(f"Request error during token refresh: {e}")
-            raise HTTPException(status_code=500, detail="Failed to refresh access token.")
+            raise HTTPException(status_code=500,
+                                detail="Failed to refresh access token.")
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP status error during token refresh: {e}")
-            raise HTTPException(status_code=400, detail="Failed to refresh access token.")
+            raise HTTPException(status_code=400,
+                                detail="Failed to refresh access token.")
 
     new_access_token = response_json.get("access_token")
     if not new_access_token:
         logger.error("No new access token returned in response.")
-        raise HTTPException(status_code=400, detail="Failed to refresh access token.")
+        raise HTTPException(status_code=400,
+                            detail="Failed to refresh access token.")
 
     logger.info("Storing new access token in Redis.")
     await add_key_value_redis(

@@ -1,23 +1,29 @@
 # notion.py
-
+import os
 import json
 import secrets
-from fastapi import Request, HTTPException
-from fastapi.responses import HTMLResponse
-import httpx
 import asyncio
 import base64
+
+import httpx
 import requests
+from dotenv import load_dotenv
+from fastapi.responses import HTMLResponse
+from fastapi import Request, HTTPException
+
 from integrations.integration_item import IntegrationItem
+from db.redis_client import add_key_value_redis, get_value_redis, \
+    delete_key_redis
 
-from backend.db.redis_client import add_key_value_redis, get_value_redis, delete_key_redis
+load_dotenv()
 
-CLIENT_ID = 'XXX'
-CLIENT_SECRET = 'XXX'
-encoded_client_id_secret = base64.b64encode(f'{CLIENT_ID}:{CLIENT_SECRET}'.encode()).decode()
+CLIENT_ID = os.environ.get("NOTION_CLIENT_ID", "")
+CLIENT_SECRET = os.environ.get("NOTION_CLIENT_SECRET", "")
+encoded_client_id_secret = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 
 REDIRECT_URI = 'http://localhost:8000/integrations/notion/oauth2callback'
 authorization_url = f'https://api.notion.com/v1/oauth/authorize?client_id={CLIENT_ID}&response_type=code&owner=user&redirect_uri=http%3A%2F%2Flocalhost%3A8000%2Fintegrations%2Fnotion%2Foauth2callback'
+
 
 async def authorize_notion(user_id, org_id):
     state_data = {
@@ -29,6 +35,7 @@ async def authorize_notion(user_id, org_id):
     await add_key_value_redis(f'notion_state:{org_id}:{user_id}', encoded_state, expire=600)
 
     return f'{authorization_url}&state={encoded_state}'
+
 
 async def oauth2callback_notion(request: Request):
     if request.query_params.get('error'):
@@ -74,6 +81,7 @@ async def oauth2callback_notion(request: Request):
     """
     return HTMLResponse(content=close_window_script)
 
+
 async def get_notion_credentials(user_id, org_id):
     credentials = await get_value_redis(f'notion_credentials:{org_id}:{user_id}')
     if not credentials:
@@ -84,6 +92,7 @@ async def get_notion_credentials(user_id, org_id):
     await delete_key_redis(f'notion_credentials:{org_id}:{user_id}')
 
     return credentials
+
 
 def _recursive_dict_search(data, target_key):
     """Recursively search for a key in a dictionary of dictionaries."""
@@ -102,6 +111,7 @@ def _recursive_dict_search(data, target_key):
                     if result is not None:
                         return result
     return None
+
 
 def create_integration_item_metadata_object(
     response_json: str,
@@ -134,6 +144,7 @@ def create_integration_item_metadata_object(
     )
 
     return integration_item_metadata
+
 
 async def get_items_notion(credentials) -> list[IntegrationItem]:
     """Aggregates all metadata relevant for a notion integration"""

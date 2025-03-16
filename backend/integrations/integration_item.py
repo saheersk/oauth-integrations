@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, List, Dict
 
+
 class IntegrationItem:
     def __init__(
         self,
