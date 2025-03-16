@@ -52,3 +52,6 @@ VectorShift - Integrations Technical Assessment Instructions.pdf
 
 
 ./backend/.env
+
+# .kube/
+.kube/backend-secret.yml
