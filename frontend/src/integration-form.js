@@ -117,6 +117,7 @@ export const IntegrationForm = () => {
               integrationType={integrationParams?.type}
               credentials={integrationParams?.credentials}
               userId={user}
+              orgId={org}
             />
           </Box>
         )}

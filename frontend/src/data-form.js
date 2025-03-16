@@ -19,9 +19,9 @@ const endpointMapping = {
   HubSpot: "hubspot",
 };
 
-export const DataForm = ({ integrationType, credentials, userId }) => {
+export const DataForm = ({ integrationType, credentials, userId, orgId }) => {
   const [loadedData, setLoadedData] = useState(null);
-  const [loading, setLoading] = useState(false); // New state for loading
+  const [loading, setLoading] = useState(false);
   const endpoint = endpointMapping[integrationType];
 
   const handleLoad = async () => {
@@ -30,15 +30,14 @@ export const DataForm = ({ integrationType, credentials, userId }) => {
       return;
     }
 
-    setLoading(true); // Start loading
+    setLoading(true);
 
     try {
       const formData = new FormData();
 
-      const credentialsWithUser = { ...credentials, user_id: userId, org_id: 'TestOrg' };
+      const credentialsWithUser = { ...credentials, user_id: userId, org_id: orgId };
       formData.append("credentials", JSON.stringify(credentialsWithUser));
 
-      // Make API request to the corresponding endpoint
       const response = await axios.post(
         `http://localhost:8000/integrations/${endpoint}/load`,
         formData
@@ -50,9 +49,8 @@ export const DataForm = ({ integrationType, credentials, userId }) => {
       }
 
       setLoadedData(response.data);
-      console.log(response.data, "hubspot data")
+      console.log(response.data, "hubspot data======")
     } catch (e) {
-      console.log(e, "===e====")
       alert(e?.response?.data || "Error loading data");
     } finally {
       setLoading(false);
