@@ -9,7 +9,7 @@ import secrets
 from typing import List, Union
 
 import httpx
-from redis_client import add_key_value_redis, delete_key_redis, get_value_redis
+from backend.db.redis_client import add_key_value_redis, delete_key_redis, get_value_redis
 from dotenv import load_dotenv
 from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse
