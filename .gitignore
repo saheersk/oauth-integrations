@@ -49,3 +49,6 @@ docker-compose.dev.yml
 .env.docker
 
 VectorShift - Integrations Technical Assessment Instructions.pdf
+
+
+./backend/.env
