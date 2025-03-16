@@ -1,0 +1,34 @@
+# OS-specific files
+Thumbs.db
+Desktop.ini
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Coverage reports
+coverage/
+*.coveragerc
+
+# npm logs
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Docker
+.docker/
+
+# Python virtual environment
+venv/
+env/
+
+# Local configuration
+*.local
+
+VectorShift - Integrations Technical Assessment Instructions.pdf
+
+# Mac OS
+.DS_Store
